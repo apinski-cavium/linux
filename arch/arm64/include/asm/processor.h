@@ -124,6 +124,14 @@ static inline void start_thread(struct pt_regs *regs, unsigned long pc,
 static inline void compat_start_thread(struct pt_regs *regs, unsigned long pc,
 				       unsigned long sp)
 {
+	if (is_ilp32_compat_task()) {
+		/*
+		 * ILP32 threads are started the
+		 * same way as LP64 threads.
+		 */
+		start_thread(regs, pc, sp);
+		return;
+	}
 	start_thread_common(regs, pc);
 	regs->pstate = COMPAT_PSR_MODE_USR;
 	if (pc & 1)
