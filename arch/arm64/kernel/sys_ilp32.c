@@ -61,7 +61,6 @@ asmlinkage long sys_rt_sigreturn_wrapper(void);
 #define sys_ptrace		compat_sys_ptrace
 
 /* struct msghdr */
-#define sys_msgctl		compat_sys_msgctl
 #define sys_recvfrom		compat_sys_recvfrom
 #define sys_recvmmsg		compat_sys_recvmmsg
 #define sys_sendmmsg		compat_sys_sendmmsg
@@ -145,6 +144,25 @@ asmlinkage long compat_sys_fstatfs64_wrapper(void);
 #define sys_fstatfs            compat_sys_fstatfs64_wrapper
 asmlinkage long compat_sys_statfs64_wrapper(void);
 #define sys_statfs             compat_sys_statfs64_wrapper
+
+/* IPC_64 */
+asmlinkage long ilp32_sys_msgctl(int first, int second, void __user *uptr)
+{
+	return compat_sys_msgctl(first, second | IPC_64, uptr);
+}
+#define sys_msgctl		ilp32_sys_msgctl
+
+asmlinkage long ilp32_sys_shmctl(int first, int second, void __user *uptr)
+{
+	return compat_sys_shmctl(first, second | IPC_64, uptr);
+}
+#define sys_shmctl		ilp32_sys_shmctl
+
+asmlinkage long ilp32_sys_semctl(int first, int second, int third, int arg)
+{
+	return compat_sys_semctl(first, second, third | IPC_64, arg);
+}
+#define sys_semctl	ilp32_sys_semctl
 
 /* We need to make sure the pointer gets copied correctly. */
 asmlinkage long ilp32_sys_mq_notify(mqd_t mqdes, const struct sigevent __user *u_notification)
