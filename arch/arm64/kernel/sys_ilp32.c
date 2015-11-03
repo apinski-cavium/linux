@@ -98,6 +98,25 @@ asmlinkage long compat_sys_statfs64_wrapper(void);
 
 #define compat_sys_pwritev	       compat_sys_pwritev64
 
+/* IPC_64 */
+asmlinkage long ilp32_sys_msgctl(int first, int second, void __user *uptr)
+{
+	return compat_sys_msgctl(first, second | IPC_64, uptr);
+}
+#define compat_sys_msgctl		ilp32_sys_msgctl
+
+asmlinkage long ilp32_sys_shmctl(int first, int second, void __user *uptr)
+{
+	return compat_sys_shmctl(first, second | IPC_64, uptr);
+}
+#define compat_sys_shmctl		ilp32_sys_shmctl
+
+asmlinkage long ilp32_sys_semctl(int first, int second, int third, int arg)
+{
+	return compat_sys_semctl(first, second, third | IPC_64, arg);
+}
+#define compat_sys_semctl	ilp32_sys_semctl
+
 #include <asm/syscall.h>
 
 #undef __SYSCALL
