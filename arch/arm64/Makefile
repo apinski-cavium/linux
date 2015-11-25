@@ -20,6 +20,10 @@ KBUILD_DEFCONFIG := defconfig
 # Check for binutils support for specific extensions
 lseinstr := $(call as-instr,.arch_extension lse,-DCONFIG_AS_LSE=1)
 
+# Check KBUILD_CFLAGS for  '-O0' as it's not supported now.
+$(if $(findstring -O0,$(KBUILD_CFLAGS)), \
+	$(error ARM64 does not support O0 optimization level. Try O1 or higher))
+
 ifeq ($(CONFIG_ARM64_LSE_ATOMICS), y)
   ifeq ($(lseinstr),)
 $(warning LSE atomics not supported by binutils)

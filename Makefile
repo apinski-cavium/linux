@@ -602,7 +602,6 @@ all: vmlinux
 ARCH_CPPFLAGS :=
 ARCH_AFLAGS :=
 ARCH_CFLAGS :=
-include arch/$(SRCARCH)/Makefile
 
 KBUILD_CFLAGS	+= $(call cc-option,-fno-delete-null-pointer-checks,)
 
@@ -775,6 +774,7 @@ ifeq ($(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-goto.sh $(CC)), y)
 	KBUILD_AFLAGS += -DCC_HAVE_ASM_GOTO
 endif
 
+include arch/$(SRCARCH)/Makefile
 include scripts/Makefile.kasan
 include scripts/Makefile.extrawarn
 
