@@ -19,6 +19,7 @@
 #endif
 #ifdef CONFIG_AARCH32_EL0
 #define __ARCH_WANT_COMPAT_SYS_GETDENTS64
+#define __ARCH_WANT_SYS_LLSEEK
 #define __ARCH_WANT_COMPAT_STAT64
 #define __ARCH_WANT_SYS_GETHOSTNAME
 #define __ARCH_WANT_SYS_PAUSE
@@ -42,7 +43,6 @@
 #define __NR_compat_sigreturn		119
 #define __NR_compat_rt_sigreturn	173
 
-#define __ARCH_WANT_SYS_LLSEEK
 
 /*
  * The following SVCs are ARM private.

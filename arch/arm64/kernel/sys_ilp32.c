@@ -86,7 +86,7 @@ asmlinkage long sys_rt_sigreturn_wrapper(void);
 #define compat_sys_clock_nanosleep     sys_clock_nanosleep
 #define compat_sys_clock_getres        sys_clock_getres
 
-#define sys_lseek                      sys_llseek
+#define sys_llseek                     sys_lseek
 
 asmlinkage long compat_sys_mmap2_wrapper(void);
 #define sys_mmap2                      compat_sys_mmap2_wrapper
