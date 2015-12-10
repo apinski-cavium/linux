@@ -43,6 +43,9 @@
 #define sys_llseek                     sys_lseek
 #define sys_mmap2		       sys_mmap
 
+asmlinkage long ilp32_sys_rt_sigreturn_wrapper(void);
+#define compat_sys_rt_sigreturn        ilp32_sys_rt_sigreturn_wrapper
+
 #include <asm/syscall.h>
 
 #undef __SYSCALL
