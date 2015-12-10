@@ -46,6 +46,9 @@ asmlinkage long sys_mmap(unsigned long addr, unsigned long len,
 			 unsigned long fd, off_t off);
 #define sys_mmap2		       sys_mmap
 
+asmlinkage long ilp32_sys_rt_sigreturn_wrapper(void);
+#define compat_sys_rt_sigreturn        ilp32_sys_rt_sigreturn_wrapper
+
 #include <asm/syscall.h>
 
 #undef __SYSCALL
