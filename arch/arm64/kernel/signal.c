@@ -34,12 +34,7 @@
 #include <asm/fpsimd.h>
 #include <asm/signal32.h>
 #include <asm/vdso.h>
-
-struct sigframe {
-	struct ucontext uc;
-	u64 fp;
-	u64 lr;
-};
+#include <asm/signal_common.h>
 
 /*
  * Do a signal return; undo the signal stack. These are aligned to 128-bit.
@@ -49,7 +44,7 @@ struct rt_sigframe {
 	struct sigframe sig;
 };
 
-static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
+int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
 {
 	struct fpsimd_state *fpsimd = &current->thread.fpsimd_state;
 	int err;
@@ -69,7 +64,7 @@ static int preserve_fpsimd_context(struct fpsimd_context __user *ctx)
 	return err ? -EFAULT : 0;
 }
 
-static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
+int restore_fpsimd_context(struct fpsimd_context __user *ctx)
 {
 	struct fpsimd_state fpsimd;
 	__u32 magic, size;
@@ -96,7 +91,7 @@ static int restore_fpsimd_context(struct fpsimd_context __user *ctx)
 	return err ? -EFAULT : 0;
 }
 
-static int restore_sigframe(struct pt_regs *regs,
+int restore_sigframe(struct pt_regs *regs,
 			    struct sigframe __user *sf)
 {
 	sigset_t set;
@@ -166,7 +161,7 @@ badframe:
 	return 0;
 }
 
-static int setup_sigframe(struct sigframe __user *sf,
+int setup_sigframe(struct sigframe __user *sf,
 			  struct pt_regs *regs, sigset_t *set)
 {
 	int i, err = 0;
@@ -233,7 +228,7 @@ static struct rt_sigframe __user *get_sigframe(struct ksignal *ksig,
 	return frame;
 }
 
-static void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
 			 void __user *frame, off_t sigframe_off, int usig)
 {
 	__sigrestore_t sigtramp;
