@@ -432,6 +432,16 @@ config CAVIUM_ERRATUM_23154
 
 	  If unsure, say Y.
 
+config CAVIUM_ERRATUM_27456
+	bool "Cavium erratum 27456: TLBI not keeping icache correctly"
+	default y
+	help
+	  TLBI is not keeping the virtual address mapping correctly for
+	  the icache.  The fix is to flush the icache when changing the
+	  mm context.
+
+	  If unsure, say Y.
+
 endmenu
 
 
