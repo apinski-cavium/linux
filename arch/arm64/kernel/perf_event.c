@@ -369,8 +369,10 @@ static const struct attribute_group *armv8_pmuv3_attr_groups[] = {
 /*
  * PMXEVTYPER: Event selection reg
  */
-#define	ARMV8_EVTYPE_MASK	0xc80003ff	/* Mask for writable bits */
-#define	ARMV8_EVTYPE_EVENT	0x3ff		/* Mask for EVENT bits */
+static u32 armv8_evtype_mask = 0xc80003ff;
+static u32 armv8_evtype_event = 0x3ff;
+#define	ARMV8_EVTYPE_MASK	armv8_evtype_mask	/* Mask for writable bits */
+#define	ARMV8_EVTYPE_EVENT	armv8_evtype_event	/* Mask for EVENT bits */
 
 /*
  * Event filters for PMUv3
@@ -776,6 +778,8 @@ static int armv8pmu_probe_num_events(struct arm_pmu *arm_pmu)
 
 static void armv8_pmu_init(struct arm_pmu *cpu_pmu)
 {
+	u64 dfr;
+
 	cpu_pmu->handle_irq		= armv8pmu_handle_irq,
 	cpu_pmu->enable			= armv8pmu_enable_event,
 	cpu_pmu->disable		= armv8pmu_disable_event,
@@ -787,6 +791,15 @@ static void armv8_pmu_init(struct arm_pmu *cpu_pmu)
 	cpu_pmu->reset			= armv8pmu_reset,
 	cpu_pmu->max_period		= (1LLU << 32) - 1,
 	cpu_pmu->set_event_filter	= armv8pmu_set_event_filter;
+
+	/* ARMv8.1 PMUv3 has 16 bits for the event rather than 10 bits in PMUv3. */
+	dfr = read_cpuid(ID_AA64DFR0_EL1);
+	if (((dfr >> 8) & 0xf) == 0x4) {
+		armv8_evtype_event = 0xffff;
+		armv8_evtype_mask |= armv8_evtype_event;
+
+	}
+
 }
 
 static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
