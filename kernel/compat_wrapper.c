@@ -6,58 +6,7 @@
 
 #include <linux/syscalls.h>
 #include <linux/compat.h>
-#include "entry.h"
-
-#define COMPAT_SYSCALL_WRAP1(name, ...) \
-	COMPAT_SYSCALL_WRAPx(1, _##name, __VA_ARGS__)
-#define COMPAT_SYSCALL_WRAP2(name, ...) \
-	COMPAT_SYSCALL_WRAPx(2, _##name, __VA_ARGS__)
-#define COMPAT_SYSCALL_WRAP3(name, ...) \
-	COMPAT_SYSCALL_WRAPx(3, _##name, __VA_ARGS__)
-#define COMPAT_SYSCALL_WRAP4(name, ...) \
-	COMPAT_SYSCALL_WRAPx(4, _##name, __VA_ARGS__)
-#define COMPAT_SYSCALL_WRAP5(name, ...) \
-	COMPAT_SYSCALL_WRAPx(5, _##name, __VA_ARGS__)
-#define COMPAT_SYSCALL_WRAP6(name, ...) \
-	COMPAT_SYSCALL_WRAPx(6, _##name, __VA_ARGS__)
-
-#define __SC_COMPAT_TYPE(t, a) \
-	__typeof(__builtin_choose_expr(sizeof(t) > 4, 0L, (t)0)) a
-
-#define __SC_COMPAT_CAST(t, a)						\
-({									\
-	long __ReS = a;							\
-									\
-	BUILD_BUG_ON((sizeof(t) > 4) && !__TYPE_IS_L(t) &&		\
-		     !__TYPE_IS_UL(t) && !__TYPE_IS_PTR(t));		\
-	if (__TYPE_IS_L(t))						\
-		__ReS = (s32)a;						\
-	if (__TYPE_IS_UL(t))						\
-		__ReS = (u32)a;						\
-	if (__TYPE_IS_PTR(t))						\
-		__ReS = a & 0x7fffffff;					\
-	(t)__ReS;							\
-})
-
-/*
- * The COMPAT_SYSCALL_WRAP macro generates system call wrappers to be used by
- * compat tasks. These wrappers will only be used for system calls where only
- * the system call arguments need sign or zero extension or zeroing of the upper
- * 33 bits of pointers.
- * Note: since the wrapper function will afterwards call a system call which
- * again performs zero and sign extension for all system call arguments with
- * a size of less than eight bytes, these compat wrappers only touch those
- * system call arguments with a size of eight bytes ((unsigned) long and
- * pointers). Zero and sign extension for e.g. int parameters will be done by
- * the regular system call wrappers.
- */
-#define COMPAT_SYSCALL_WRAPx(x, name, ...)					\
-asmlinkage long sys##name(__MAP(x,__SC_DECL,__VA_ARGS__));			\
-asmlinkage long notrace compat_sys##name(__MAP(x,__SC_COMPAT_TYPE,__VA_ARGS__));\
-asmlinkage long notrace compat_sys##name(__MAP(x,__SC_COMPAT_TYPE,__VA_ARGS__))	\
-{										\
-	return sys##name(__MAP(x,__SC_COMPAT_CAST,__VA_ARGS__));		\
-}
+#include <linux/compat_wrapper.h>
 
 COMPAT_SYSCALL_WRAP2(creat, const char __user *, pathname, umode_t, mode);
 COMPAT_SYSCALL_WRAP2(link, const char __user *, oldname, const char __user *, newname);
@@ -65,14 +14,22 @@ COMPAT_SYSCALL_WRAP1(unlink, const char __user *, pathname);
 COMPAT_SYSCALL_WRAP1(chdir, const char __user *, filename);
 COMPAT_SYSCALL_WRAP3(mknod, const char __user *, filename, umode_t, mode, unsigned, dev);
 COMPAT_SYSCALL_WRAP2(chmod, const char __user *, filename, umode_t, mode);
+
+#ifdef __ARCH_WANT_SYS_OLDUMOUNT
 COMPAT_SYSCALL_WRAP1(oldumount, char __user *, name);
+#endif
+
 COMPAT_SYSCALL_WRAP2(access, const char __user *, filename, int, mode);
 COMPAT_SYSCALL_WRAP2(rename, const char __user *, oldname, const char __user *, newname);
 COMPAT_SYSCALL_WRAP2(mkdir, const char __user *, pathname, umode_t, mode);
 COMPAT_SYSCALL_WRAP1(rmdir, const char __user *, pathname);
 COMPAT_SYSCALL_WRAP1(pipe, int __user *, fildes);
 COMPAT_SYSCALL_WRAP1(brk, unsigned long, brk);
+
+#ifdef __ARCH_WANT_SYS_SIGNAL
 COMPAT_SYSCALL_WRAP2(signal, int, sig, __sighandler_t, handler);
+#endif
+
 COMPAT_SYSCALL_WRAP1(acct, const char __user *, name);
 COMPAT_SYSCALL_WRAP2(umount, char __user *, name, int, flags);
 COMPAT_SYSCALL_WRAP1(chroot, const char __user *, filename);
@@ -94,7 +51,11 @@ COMPAT_SYSCALL_WRAP2(delete_module, const char __user *, name_user, unsigned int
 COMPAT_SYSCALL_WRAP4(quotactl, unsigned int, cmd, const char __user *, special, qid_t, id, void __user *, addr);
 COMPAT_SYSCALL_WRAP2(bdflush, int, func, long, data);
 COMPAT_SYSCALL_WRAP3(sysfs, int, option, unsigned long, arg1, unsigned long, arg2);
+
+#ifdef __ARCH_WANT_SYS_LLSEEK
 COMPAT_SYSCALL_WRAP5(llseek, unsigned int, fd, unsigned long, high, unsigned long, low, loff_t __user *, result, unsigned int, whence);
+#endif
+
 COMPAT_SYSCALL_WRAP3(msync, unsigned long, start, size_t, len, int, flags);
 COMPAT_SYSCALL_WRAP2(mlock, unsigned long, start, size_t, len);
 COMPAT_SYSCALL_WRAP2(munlock, unsigned long, start, size_t, len);
@@ -119,7 +80,11 @@ COMPAT_SYSCALL_WRAP3(madvise, unsigned long, start, size_t, len, int, behavior);
 COMPAT_SYSCALL_WRAP5(setxattr, const char __user *, path, const char __user *, name, const void __user *, value, size_t, size, int, flags);
 COMPAT_SYSCALL_WRAP5(lsetxattr, const char __user *, path, const char __user *, name, const void __user *, value, size_t, size, int, flags);
 COMPAT_SYSCALL_WRAP5(fsetxattr, int, fd, const char __user *, name, const void __user *, value, size_t, size, int, flags);
+
+#ifndef __ARCH_WANT_COMPAT_SYS_GETDENTS64
 COMPAT_SYSCALL_WRAP3(getdents64, unsigned int, fd, struct linux_dirent64 __user *, dirent, unsigned int, count);
+#endif
+
 COMPAT_SYSCALL_WRAP4(getxattr, const char __user *, path, const char __user *, name, void __user *, value, size_t, size);
 COMPAT_SYSCALL_WRAP4(lgetxattr, const char __user *, path, const char __user *, name, void __user *, value, size_t, size);
 COMPAT_SYSCALL_WRAP4(fgetxattr, int, fd, const char __user *, name, void __user *, value, size_t, size);
@@ -155,7 +120,32 @@ COMPAT_SYSCALL_WRAP4(tee, int, fdin, int, fdout, size_t, len, unsigned int, flag
 COMPAT_SYSCALL_WRAP3(getcpu, unsigned __user *, cpu, unsigned __user *, node, struct getcpu_cache __user *, cache);
 COMPAT_SYSCALL_WRAP2(pipe2, int __user *, fildes, int, flags);
 COMPAT_SYSCALL_WRAP5(perf_event_open, struct perf_event_attr __user *, attr_uptr, pid_t, pid, int, cpu, int, group_fd, unsigned long, flags);
-COMPAT_SYSCALL_WRAP5(clone, unsigned long, newsp, unsigned long, clone_flags, int __user *, parent_tidptr, int __user *, child_tidptr, unsigned long, tls);
+
+#ifdef __ARCH_WANT_SYS_CLONE
+#ifdef CONFIG_CLONE_BACKWARDS
+COMPAT_SYSCALL_WRAP5(clone, unsigned long, clone_flags, unsigned long, newsp,
+		 int __user *, parent_tidptr,
+		 unsigned long, tls,
+		 int __user *, child_tidptr);
+#elif defined(CONFIG_CLONE_BACKWARDS2)
+COMPAT_SYSCALL_WRAP5(clone, unsigned long, newsp, unsigned long, clone_flags,
+		 int __user *, parent_tidptr,
+		 int __user *, child_tidptr,
+		 unsigned long, tls);
+#elif defined(CONFIG_CLONE_BACKWARDS3)
+COMPAT_SYSCALL_WRAP6(clone, unsigned long, clone_flags, unsigned long, newsp,
+		int, stack_size,
+		int __user *, parent_tidptr,
+		int __user *, child_tidptr,
+		unsigned long, tls);
+#else
+COMPAT_SYSCALL_WRAP5(clone, unsigned long, clone_flags, unsigned long, newsp,
+		 int __user *, parent_tidptr,
+		 int __user *, child_tidptr,
+		 unsigned long, tls);
+#endif
+#endif
+
 COMPAT_SYSCALL_WRAP4(prlimit64, pid_t, pid, unsigned int, resource, const struct rlimit64 __user *, new_rlim, struct rlimit64 __user *, old_rlim);
 COMPAT_SYSCALL_WRAP5(name_to_handle_at, int, dfd, const char __user *, name, struct file_handle __user *, handle, int __user *, mnt_id, int, flag);
 COMPAT_SYSCALL_WRAP5(kcmp, pid_t, pid1, pid_t, pid2, int, type, unsigned long, idx1, unsigned long, idx2);
@@ -167,8 +157,6 @@ COMPAT_SYSCALL_WRAP3(seccomp, unsigned int, op, unsigned int, flags, const char 
 COMPAT_SYSCALL_WRAP3(getrandom, char __user *, buf, size_t, count, unsigned int, flags)
 COMPAT_SYSCALL_WRAP2(memfd_create, const char __user *, uname, unsigned int, flags)
 COMPAT_SYSCALL_WRAP3(bpf, int, cmd, union bpf_attr *, attr, unsigned int, size);
-COMPAT_SYSCALL_WRAP3(s390_pci_mmio_write, const unsigned long, mmio_addr, const void __user *, user_buffer, const size_t, length);
-COMPAT_SYSCALL_WRAP3(s390_pci_mmio_read, const unsigned long, mmio_addr, void __user *, user_buffer, const size_t, length);
 COMPAT_SYSCALL_WRAP4(socketpair, int, family, int, type, int, protocol, int __user *, usockvec);
 COMPAT_SYSCALL_WRAP3(bind, int, fd, struct sockaddr __user *, umyaddr, int, addrlen);
 COMPAT_SYSCALL_WRAP3(connect, int, fd, struct sockaddr __user *, uservaddr, int, addrlen);
