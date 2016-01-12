@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 #include <linux/syscalls.h>
 #include <linux/compat.h>
+#include <linux/compat_wrapper.h>
 #include <asm-generic/syscalls.h>
 
 /* Using non-compat syscalls where necessary */
@@ -50,11 +51,13 @@ asmlinkage long ilp32_sys_rt_sigreturn_wrapper(void);
 
 #undef __SYSCALL
 #undef __SC_COMP
+#undef __SC_WRAP
 #undef __SC_3264
 #undef __SC_COMP_3264
 
 #define __SYSCALL_COMPAT
 #define __SYSCALL(nr, sym)	[nr] = sym,
+#define __SC_WRAP(nr, sym)	[nr] = compat_##sym,
 
 /*
  * The sys_call_ilp32_table array must be 4K aligned to be accessible from
