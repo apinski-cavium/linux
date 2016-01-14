@@ -16,6 +16,7 @@
 #ifndef __ASM_ELF_H
 #define __ASM_ELF_H
 
+#include <linux/compat.h>
 #include <asm/hwcap.h>
 
 /*
@@ -148,13 +149,9 @@ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
 				       int uses_interp);
 
 /* 1GB of VA */
-#ifdef CONFIG_COMPAT
-#define STACK_RND_MASK			(test_thread_flag(TIF_32BIT) ? \
+#define STACK_RND_MASK			(is_compat_task() ? \
 						0x7ff >> (PAGE_SHIFT - 12) : \
 						0x3ffff >> (PAGE_SHIFT - 12))
-#else
-#define STACK_RND_MASK			(0x3ffff >> (PAGE_SHIFT - 12))
-#endif
 
 #ifdef CONFIG_COMPAT
 
