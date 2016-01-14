@@ -22,7 +22,7 @@
 #endif
 
 #ifndef __SC_COMPAT_CAST
-#define __SC_COMPAT_CAST(t, a)	((t)(long) ((t)(-1) < 0 ? (s32)(a) : (u32)(a)))
+#define __SC_COMPAT_CAST(t, a)	((t) ((t)(-1) < 0 ? (s64)(s32)(a) : (u64)(u32)(a)))
 #endif
 /*
  * The COMPAT_SYSCALL_WRAP macro generates system call wrappers to be used by
