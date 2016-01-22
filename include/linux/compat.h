@@ -28,6 +28,10 @@
 #define __SC_DELOUSE(t,v) ((t)(unsigned long)(v))
 #endif
 
+#ifndef __TYPE_IS_PTR
+#define __TYPE_IS_PTR(t) (!__builtin_types_compatible_p(typeof(0?(t)0:0ULL), u64))
+#endif
+
 #define COMPAT_SYSCALL_DEFINE0(name) \
 	asmlinkage long compat_sys_##name(void)
 
@@ -718,4 +722,53 @@ asmlinkage long compat_sys_fanotify_mark(int, unsigned int, __u32, __u32,
 #define is_compat_task() (0)
 
 #endif /* CONFIG_COMPAT */
+
+#ifdef CONFIG_COMPAT_WRAPPER
+
+#define COMPAT_SYSCALL_WRAP1(name, ...) COMPAT_SYSCALL_WRAPx(1, _##name, __VA_ARGS__)
+#define COMPAT_SYSCALL_WRAP2(name, ...) COMPAT_SYSCALL_WRAPx(2, _##name, __VA_ARGS__)
+#define COMPAT_SYSCALL_WRAP3(name, ...) COMPAT_SYSCALL_WRAPx(3, _##name, __VA_ARGS__)
+#define COMPAT_SYSCALL_WRAP4(name, ...) COMPAT_SYSCALL_WRAPx(4, _##name, __VA_ARGS__)
+#define COMPAT_SYSCALL_WRAP5(name, ...) COMPAT_SYSCALL_WRAPx(5, _##name, __VA_ARGS__)
+#define COMPAT_SYSCALL_WRAP6(name, ...) COMPAT_SYSCALL_WRAPx(6, _##name, __VA_ARGS__)
+
+#ifndef __SC_COMPAT_TYPE
+#define __SC_COMPAT_TYPE(t, a) \
+	__typeof(__builtin_choose_expr(sizeof(t) > 4, 0L, (t)0)) a
+#endif
+
+#ifndef __SC_COMPAT_CAST
+#define __SC_COMPAT_CAST(t, a) ({					\
+	BUILD_BUG_ON((sizeof(t) > 4) && !__TYPE_IS_L(t) &&		\
+		     !__TYPE_IS_UL(t) && !__TYPE_IS_PTR(t));		\
+	((t) ((t)(-1) < 0 ? (s64)(s32)(a) : (u64)(u32)(a)));		\
+})
+#endif
+
+#ifndef COMPAT_SYSCALL_WRAPx
+/*
+ * The COMPAT_SYSCALL_WRAP macro generates system call wrappers to be used by
+ * compat tasks. These wrappers will only be used for system calls where only
+ * the system call arguments need sign or zero extension or zeroing of the upper
+ * parts of arguments passed in register.
+ * Note: since the wrapper function will afterwards call a system call which
+ * again performs zero and sign extension for all system call arguments with
+ * a size of less than eight bytes, these compat wrappers only touch those
+ * system call arguments with a size of eight bytes ((unsigned) long and
+ * pointers). Zero and sign extension for e.g. int parameters will be done by
+ * the regular system call wrappers.
+ */
+#define COMPAT_SYSCALL_WRAPx(x, name, ...)						\
+asmlinkage long sys##name(__MAP(x,__SC_DECL,__VA_ARGS__));				\
+asmlinkage long compat_sys##name(__MAP(x,__SC_DECL,__VA_ARGS__))			\
+		__attribute__((alias(__stringify(compat_SyS##name))));			\
+asmlinkage long notrace compat_SyS##name(__MAP(x,__SC_COMPAT_TYPE,__VA_ARGS__));	\
+asmlinkage long notrace compat_SyS##name(__MAP(x,__SC_COMPAT_TYPE,__VA_ARGS__))		\
+{											\
+	return sys##name(__MAP(x,__SC_COMPAT_CAST,__VA_ARGS__));			\
+}
+#endif
+
+#endif /* CONFIG_COMPAT_WRAPPER */
+
 #endif /* _LINUX_COMPAT_H */
