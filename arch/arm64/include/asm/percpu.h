@@ -36,7 +36,7 @@ static inline unsigned long __my_cpu_offset(void)
 }
 #define __my_cpu_offset __my_cpu_offset()
 
-#define PERCPU_OP(op, asm_op)						\
+#define PERCPU_OP(op, asm_op, asmlse_op)				\
 static inline unsigned long __percpu_##op(void *ptr,			\
 			unsigned long val, int size)			\
 {									\
@@ -44,48 +44,64 @@ static inline unsigned long __percpu_##op(void *ptr,			\
 									\
 	switch (size) {							\
 	case 1:								\
-		do {							\
 			asm ("//__per_cpu_" #op "_1\n"			\
-			"ldxrb	  %w[ret], %[ptr]\n"			\
+			ARM64_LSE_ATOMIC_INSN(				\
+			"1: ldxrb	  %w[ret], %[ptr]\n"		\
 			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
 			"stxrb	  %w[loop], %w[ret], %[ptr]\n"		\
+			"cbnz     %w[loop], 1b\n",			\
+			"nop\n"						\
+			#asmlse_op "b	%w[val], %w[ret], %[ptr]\n"	\
+			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
+			"nop\n")					\
 			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
 			  [ptr] "+Q"(*(u8 *)ptr)			\
-			: [val] "Ir" (val));				\
-		} while (loop);						\
+			: [val] "r" (val));				\
 		break;							\
 	case 2:								\
-		do {							\
 			asm ("//__per_cpu_" #op "_2\n"			\
-			"ldxrh	  %w[ret], %[ptr]\n"			\
+			ARM64_LSE_ATOMIC_INSN(				\
+			"1: ldxrh	  %w[ret], %[ptr]\n"		\
 			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
 			"stxrh	  %w[loop], %w[ret], %[ptr]\n"		\
+			"cbnz     %w[loop], 1b\n",			\
+			"nop\n"						\
+			#asmlse_op "h	%w[val], %w[ret], %[ptr]\n"	\
+			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
+			"nop\n")					\
 			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
 			  [ptr]  "+Q"(*(u16 *)ptr)			\
-			: [val] "Ir" (val));				\
-		} while (loop);						\
+			: [val] "r" (val));				\
 		break;							\
 	case 4:								\
-		do {							\
 			asm ("//__per_cpu_" #op "_4\n"			\
-			"ldxr	  %w[ret], %[ptr]\n"			\
+			ARM64_LSE_ATOMIC_INSN(				\
+			"1: ldxr	  %w[ret], %[ptr]\n"		\
 			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
 			"stxr	  %w[loop], %w[ret], %[ptr]\n"		\
+			"cbnz     %w[loop], 1b\n",			\
+			"nop\n"						\
+			#asmlse_op "	%w[val], %w[ret], %[ptr]\n"	\
+			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
+			"nop\n")					\
 			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
 			  [ptr] "+Q"(*(u32 *)ptr)			\
-			: [val] "Ir" (val));				\
-		} while (loop);						\
+			: [val] "r" (val));				\
 		break;							\
 	case 8:								\
-		do {							\
 			asm ("//__per_cpu_" #op "_8\n"			\
-			"ldxr	  %[ret], %[ptr]\n"			\
+			ARM64_LSE_ATOMIC_INSN(				\
+			"1: ldxr	  %[ret], %[ptr]\n"		\
 			#asm_op " %[ret], %[ret], %[val]\n"		\
 			"stxr	  %w[loop], %[ret], %[ptr]\n"		\
+			"cbnz     %w[loop], 1b\n",			\
+			"nop\n"						\
+			#asmlse_op "	%[val], %[ret], %[ptr]\n"	\
+			#asm_op " %[ret], %[ret], %[val]\n"		\
+			"nop\n")					\
 			: [loop] "=&r" (loop), [ret] "=&r" (ret),	\
 			  [ptr] "+Q"(*(u64 *)ptr)			\
-			: [val] "Ir" (val));				\
-		} while (loop);						\
+			: [val] "r" (val));				\
 		break;							\
 	default:							\
 		BUILD_BUG();						\
@@ -94,10 +110,36 @@ static inline unsigned long __percpu_##op(void *ptr,			\
 	return ret;							\
 }
 
-PERCPU_OP(add, add)
-PERCPU_OP(and, and)
-PERCPU_OP(or, orr)
+PERCPU_OP(add, add, ldadd)
+PERCPU_OP(clr, bic, ldclr)
+PERCPU_OP(or, orr, ldset)
 #undef PERCPU_OP
+
+static inline unsigned long __percpu_and(void *ptr,
+					unsigned long val, int size)
+{
+	unsigned long ret;
+
+	ret = __percpu_clr(ptr, ~val, size);
+	switch (size) {
+	case 1:
+		ret = (u8)ret;
+		break;
+	case 2:
+		ret = (u16)ret;
+		break;
+	case 4:
+		ret = (u32)ret;
+		break;
+	case 8:
+		ret = (u64)ret;
+		break;
+	default:
+		BUILD_BUG();
+	}
+
+	return ret;
+}
 
 static inline unsigned long __percpu_read(void *ptr, int size)
 {
