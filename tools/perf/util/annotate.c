@@ -65,7 +65,7 @@ static int call__parse(struct ins_operands *ops)
 
 	name++;
 
-#ifdef __arm__
+#if defined(__arm__)||defined(__aarch64__)
 	if (strchr(name, '+'))
 		return -1;
 #endif
@@ -253,6 +253,8 @@ static int mov__parse(struct ins_operands *ops)
 	target = ++s;
 #ifdef __arm__
 	comment = strchr(s, ';');
+#elif defined(__aarch64__)
+	comment = strstr(s, "//");
 #else
 	comment = strchr(s, '#');
 #endif
@@ -376,6 +378,23 @@ static struct ins instructions[] = {
 	{ .name = "bls",   .ops  = &jump_ops, },
 	{ .name = "blx",   .ops  = &call_ops, },
 	{ .name = "bne",   .ops  = &jump_ops, },
+#endif
+#ifdef __aarch64__
+	{ .name = "b",     .ops  = &jump_ops, }, // might also be a call
+	{ .name = "cbz",   .ops  = &jump_ops, },
+	{ .name = "cbnz",  .ops  = &jump_ops, },
+	{ .name = "tbz",   .ops  = &jump_ops, },
+	{ .name = "tbnz",  .ops  = &jump_ops, },
+	{ .name = "b.cc",  .ops  = &jump_ops, },
+	{ .name = "b.cs",  .ops  = &jump_ops, },
+	{ .name = "b.eq",  .ops  = &jump_ops, },
+	{ .name = "b.ge",  .ops  = &jump_ops, },
+	{ .name = "b.gt",  .ops  = &jump_ops, },
+	{ .name = "b.hi",  .ops  = &jump_ops, },
+	{ .name = "bl",    .ops  = &call_ops, },
+	{ .name = "b.lt",  .ops  = &jump_ops, },
+	{ .name = "b.ls",  .ops  = &jump_ops, },
+	{ .name = "b.ne",  .ops  = &jump_ops, },
 #endif
 	{ .name = "bts",   .ops  = &mov_ops, },
 	{ .name = "call",  .ops  = &call_ops, },
