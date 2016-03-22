@@ -107,6 +107,7 @@ int ilp32_setup_rt_frame(int usig, struct ksignal *ksig,
 
 	if (!frame)
 		return 1;
+	err |= copy_siginfo_to_user32(&frame->info, &ksig->info);
 
 	__put_user_error(0, &frame->sig.uc.uc_flags, err);
 	__put_user_error(NULL, &frame->sig.uc.uc_link, err);
@@ -115,12 +116,9 @@ int ilp32_setup_rt_frame(int usig, struct ksignal *ksig,
 	err |= setup_sigframe(&frame->sig, regs, set);
 	if (err == 0) {
 		setup_return(regs, &ksig->ka, frame,
-			offsetof(struct ilp32_rt_sigframe, sig), usig);
-		if (ksig->ka.sa.sa_flags & SA_SIGINFO) {
-			err |= copy_siginfo_to_user32(&frame->info, &ksig->info);
-			regs->regs[1] = (unsigned long)&frame->info;
-			regs->regs[2] = (unsigned long)&frame->sig.uc;
-		}
+				offsetof(struct ilp32_rt_sigframe, sig), usig);
+		regs->regs[1] = (unsigned long)&frame->info;
+		regs->regs[2] = (unsigned long)&frame->sig.uc;
 	}
 
 	return err;
