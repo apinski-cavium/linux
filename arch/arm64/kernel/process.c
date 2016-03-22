@@ -209,7 +209,7 @@ static void tls_thread_flush(void)
 {
 	asm ("msr tpidr_el0, xzr");
 
-	if (is_compat_task()) {
+	if (is_a32_compat_task()) {
 		current->thread.tp_value = 0;
 
 		/*
