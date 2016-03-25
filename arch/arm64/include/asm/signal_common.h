@@ -23,16 +23,10 @@
 #include <asm/ucontext.h>
 #include <asm/fpsimd.h>
 
-struct sigframe {
-	struct ucontext uc;
-	u64 fp;
-	u64 lr;
-};
-
 int preserve_fpsimd_context(struct fpsimd_context __user *ctx);
 int restore_fpsimd_context(struct fpsimd_context __user *ctx);
-int setup_sigframe(struct sigframe __user *sf, struct pt_regs *regs, sigset_t *set);
-int restore_sigframe(struct pt_regs *regs, struct sigframe __user *sf);
+int setup_sigcontex(struct sigcontext __user *uc_mcontext, struct pt_regs *regs);
+int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sf);
 void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
 			void __user *frame, off_t sigframe_off, int usig);
 

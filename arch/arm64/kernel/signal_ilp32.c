@@ -32,10 +32,75 @@
 #include <asm/unistd.h>
 #include <asm/ucontext.h>
 
+
+struct ilp32_ucontext {
+        u32		uc_flags;
+        u32		uc_link;
+        compat_stack_t  uc_stack;
+        compat_sigset_t uc_sigmask;
+        /* glibc uses a 1024-bit sigset_t */
+        __u8            __unused[1024 / 8 - sizeof(compat_sigset_t)];
+        /* last for future expansion */
+        struct sigcontext uc_mcontext;
+};
+
+struct ilp32_sigframe {
+	struct ilp32_ucontext uc;
+	u64 fp;
+	u64 lr;
+};
+
 struct ilp32_rt_sigframe {
 	struct compat_siginfo info;
-	struct sigframe sig;
+	struct ilp32_sigframe sig;
 };
+
+static inline int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set)
+{
+	compat_sigset_t cset;
+
+	cset.sig[0] = set->sig[0] & 0xffffffffull;
+	cset.sig[1] = set->sig[0] >> 32;
+
+	return copy_to_user(uset, &cset, sizeof(*uset));
+}
+
+static inline int get_sigset_t(sigset_t *set,
+                               const compat_sigset_t __user *uset)
+{
+	compat_sigset_t s32;
+
+	if (copy_from_user(&s32, uset, sizeof(*uset)))
+		return -EFAULT;
+
+	set->sig[0] = s32.sig[0] | (((long)s32.sig[1]) << 32);
+	return 0;
+}
+
+static int restore_ilp32_sigframe(struct pt_regs *regs,
+                            struct ilp32_sigframe __user *sf)
+{
+	sigset_t set;
+	int err;
+	err = get_sigset_t(&set, &sf->uc.uc_sigmask);
+	if (err == 0)
+		set_current_blocked(&set);
+	err |= restore_sigcontext(regs, &sf->uc.uc_mcontext);
+	return err;
+}
+
+static int setup_ilp32_sigframe(struct ilp32_sigframe __user *sf,
+                          struct pt_regs *regs, sigset_t *set)
+{
+	int err = 0;
+	/* set up the stack frame for unwinding */
+	__put_user_error(regs->regs[29], &sf->fp, err);
+	__put_user_error(regs->regs[30], &sf->lr, err);
+
+	err |= put_sigset_t(&sf->uc.uc_sigmask, set);
+	err |= setup_sigcontex (&sf->uc.uc_mcontext, regs);
+	return err;
+}
 
 asmlinkage long ilp32_sys_rt_sigreturn(struct pt_regs *regs)
 {
@@ -57,10 +122,10 @@ asmlinkage long ilp32_sys_rt_sigreturn(struct pt_regs *regs)
 	if (!access_ok(VERIFY_READ, frame, sizeof (*frame)))
 		goto badframe;
 
-	if (restore_sigframe(regs, &frame->sig))
+	if (restore_ilp32_sigframe(regs, &frame->sig))
 		goto badframe;
 
-	if (restore_altstack(&frame->sig.uc.uc_stack))
+	if (compat_restore_altstack(&frame->sig.uc.uc_stack))
 		goto badframe;
 
 	return regs->regs[0];
@@ -107,13 +172,14 @@ int ilp32_setup_rt_frame(int usig, struct ksignal *ksig,
 
 	if (!frame)
 		return 1;
+
 	err |= copy_siginfo_to_user32(&frame->info, &ksig->info);
 
 	__put_user_error(0, &frame->sig.uc.uc_flags, err);
-	__put_user_error(NULL, &frame->sig.uc.uc_link, err);
+	__put_user_error(0, &frame->sig.uc.uc_link, err);
 
-	err |= __save_altstack(&frame->sig.uc.uc_stack, regs->sp);
-	err |= setup_sigframe(&frame->sig, regs, set);
+	err |= __compat_save_altstack(&frame->sig.uc.uc_stack, regs->sp);
+	err |= setup_ilp32_sigframe(&frame->sig, regs, set);
 	if (err == 0) {
 		setup_return(regs, &ksig->ka, frame,
 				offsetof(struct ilp32_rt_sigframe, sig), usig);

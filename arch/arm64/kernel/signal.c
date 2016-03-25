@@ -37,6 +37,12 @@
 #include <asm/signal_common.h>
 #include <asm/signal_ilp32.h>
 
+struct sigframe {
+	struct ucontext uc;
+	u64 fp;
+	u64 lr;
+};
+
 /*
  * Do a signal return; undo the signal stack. These are aligned to 128-bit.
  */
@@ -92,23 +98,31 @@ int restore_fpsimd_context(struct fpsimd_context __user *ctx)
 	return err ? -EFAULT : 0;
 }
 
-int restore_sigframe(struct pt_regs *regs,
+static int restore_sigframe(struct pt_regs *regs,
 			    struct sigframe __user *sf)
 {
 	sigset_t set;
-	int i, err;
-	void *aux = sf->uc.uc_mcontext.__reserved;
-
+	int err;
 	err = __copy_from_user(&set, &sf->uc.uc_sigmask, sizeof(set));
 	if (err == 0)
 		set_current_blocked(&set);
 
+	err |= restore_sigcontext(regs, &sf->uc.uc_mcontext);
+	return err;
+}
+
+
+int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *uc_mcontext)
+{
+	int i, err = 0;
+	void *aux = uc_mcontext->__reserved;
+
 	for (i = 0; i < 31; i++)
-		__get_user_error(regs->regs[i], &sf->uc.uc_mcontext.regs[i],
+		__get_user_error(regs->regs[i], &uc_mcontext->regs[i],
 				 err);
-	__get_user_error(regs->sp, &sf->uc.uc_mcontext.sp, err);
-	__get_user_error(regs->pc, &sf->uc.uc_mcontext.pc, err);
-	__get_user_error(regs->pstate, &sf->uc.uc_mcontext.pstate, err);
+	__get_user_error(regs->sp, &uc_mcontext->sp, err);
+	__get_user_error(regs->pc, &uc_mcontext->pc, err);
+	__get_user_error(regs->pstate, &uc_mcontext->pstate, err);
 
 	/*
 	 * Avoid sys_rt_sigreturn() restarting.
@@ -162,27 +176,36 @@ badframe:
 	return 0;
 }
 
-int setup_sigframe(struct sigframe __user *sf,
+static int setup_sigframe(struct sigframe __user *sf,
 			  struct pt_regs *regs, sigset_t *set)
 {
-	int i, err = 0;
-	void *aux = sf->uc.uc_mcontext.__reserved;
-	struct _aarch64_ctx *end;
+	int err = 0;
 
 	/* set up the stack frame for unwinding */
 	__put_user_error(regs->regs[29], &sf->fp, err);
 	__put_user_error(regs->regs[30], &sf->lr, err);
+	err |= __copy_to_user(&sf->uc.uc_sigmask, set, sizeof(*set));
+	err |= setup_sigcontex (&sf->uc.uc_mcontext, regs);
+
+	return err;
+}
+
+int setup_sigcontex(struct sigcontext __user *uc_mcontext,
+			struct pt_regs *regs)
+{
+	void *aux = uc_mcontext->__reserved;
+	struct _aarch64_ctx *end;
+	int i, err = 0;
 
 	for (i = 0; i < 31; i++)
-		__put_user_error(regs->regs[i], &sf->uc.uc_mcontext.regs[i],
+		__put_user_error(regs->regs[i], &uc_mcontext->regs[i],
 				 err);
-	__put_user_error(regs->sp, &sf->uc.uc_mcontext.sp, err);
-	__put_user_error(regs->pc, &sf->uc.uc_mcontext.pc, err);
-	__put_user_error(regs->pstate, &sf->uc.uc_mcontext.pstate, err);
 
-	__put_user_error(current->thread.fault_address, &sf->uc.uc_mcontext.fault_address, err);
+	__put_user_error(regs->sp, &uc_mcontext->sp, err);
+	__put_user_error(regs->pc, &uc_mcontext->pc, err);
+	__put_user_error(regs->pstate, &uc_mcontext->pstate, err);
 
-	err |= __copy_to_user(&sf->uc.uc_sigmask, set, sizeof(*set));
+	__put_user_error(current->thread.fault_address, &uc_mcontext->fault_address, err);
 
 	if (err == 0) {
 		struct fpsimd_context *fpsimd_ctx =
